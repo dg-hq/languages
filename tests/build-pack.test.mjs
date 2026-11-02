@@ -244,6 +244,33 @@ test('a release builds every pack packs.json lists, from the catalogues of its a
   refused([two, { ...one, app: '>=1.0.0-beta.1' }], /overlap/);
 });
 
+// Edem's delta on #1: Rust's semver matches a pre-release only against a comparator with a pre-release on the same x.y.z, so
+// "<1.1.0" never takes 1.1.0-beta.1, and 1.0's and 1.1's beta ranges do not overlap. The overlap check reads ranges that way, and
+// lives in build-index, so an index made by hand is checked too (Abena).
+test("judges overlap as Rust's semver matches: a pre-release only where a comparator names its x.y.z with one", async () => {
+  const { buildAll } = await import('../tools/build-all.mjs');
+  const fixtures = join(ROOT, 'tests', 'fixtures', 'root');
+  const es = { locale: 'es', name: 'Spanish', nativeName: 'Español' };
+  const one = { ...es, minor: '1.0', version: '1.0.0', app: '>=1.0.0-beta.1, <1.1.0' };
+  const beta = { ...es, minor: '1.1', version: '1.1.0', app: '>=1.1.0-beta.1, <1.2.0' };
+  assert.deepEqual(buildAll([one, beta], fixtures).map((b) => b.fileName), ['es-1.0.json', 'es-1.1.json']);
+  const entry = buildPack(EN, ES, META).entry;
+  const at = (version, app) => ({ ...entry, version, app });
+  const apart = (a, b) => assert.equal(JSON.parse(buildIndex([a, b]).toString('utf8')).packs.length, 2, `${a.app} | ${b.app}`);
+  const overlap = (a, b) => assert.throws(() => buildIndex([a, b]), /overlap/, `${a.app} | ${b.app}`);
+  apart(at('1.0.0', '>=1.0.0-beta.1, <1.1.0'), at('1.1.0', '>=1.1.0-beta.1'));
+  apart(at('1.0.0', '>=1.0.0-beta.1, <1.0.0-beta.3'), at('1.1.0', '>=1.0.0-beta.3, <1.1.0'));
+  apart(at('1.0.0', '>=1.0.0, <1.1.0'), at('1.1.0', '>=1.1.0'));
+  // Both name 1.0.0's pre-releases, so 1.0.0-beta.5 matches both, though no release does.
+  overlap(at('1.0.0', '>=1.0.0-beta.1, <1.0.0'), at('1.1.0', '>=1.0.0-beta.5, <1.1.0'));
+  // "<1.1.0-beta.2" names 1.1.0's pre-releases, so 1.1.0-beta.1 matches both.
+  overlap(at('1.1.0', '>=1.1.0-beta.1, <1.2.0'), at('1.0.0', '>=1.0.0-beta.1, <1.1.0-beta.2'));
+  overlap(at('1.0.0', '>=1.0.0-beta.1, <1.1.1'), at('1.1.0', '>=1.1.0, <1.2.0'));
+  overlap(at('1.1.0', '>=1.1.0'), at('1.0.0', '>=1.0.0'));
+  assert.throws(() => buildIndex([at('1.0.0', '^1.0.0')]), /">=A" or ">=A, <B"/);
+  apart(at('1.0.0', '>=1.0.0, <1.1.0'), { ...at('1.0.0', '>=1.0.0, <1.1.0'), locale: 'en-GB' });
+});
+
 test("orders app versions as semver does, pre-releases before their release", async () => {
   const { compareVersions } = await import('../tools/build-all.mjs');
   const order = ['1.0.0-alpha', '1.0.0-alpha.1', '1.0.0-alpha.beta', '1.0.0-beta', '1.0.0-beta.2', '1.0.0-beta.11', '1.0.0-rc.1', '1.0.0', '1.0.1', '1.1.0', '2.0.0'];
