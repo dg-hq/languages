@@ -194,11 +194,14 @@ test("the test key never ships: its public half is in no file outside tests/, an
   assert.notEqual(testKey, RELEASE_KEY);
 });
 
-test('the index lists each pack once, by locale, in format 1', () => {
+// Edem's M2: the latest release lists every minor's pack, so the index keys on the file a pack is (<locale>-<major>.<minor>.json).
+test('the index lists each pack file once, by locale then version, in format 1, with two minors of one language side by side', () => {
   const a = buildPack(EN, ES, META).entry;
   const b = { ...a, locale: 'en-GB' };
-  assert.deepEqual(JSON.parse(buildIndex([a, b]).toString('utf8')), { format: 1, packs: [b, a] });
-  assert.throws(() => buildIndex([a, a]), /one pack a locale/);
+  const c = { ...a, version: '3.1.0', app: '>=3.1.0, <3.2.0' };
+  assert.deepEqual(JSON.parse(buildIndex([c, a, b]).toString('utf8')), { format: 1, packs: [b, a, c] });
+  assert.throws(() => buildIndex([a, a]), /one pack a file, and these come twice: es-3\.0\.json/);
+  assert.throws(() => buildIndex([a, { ...a, version: '3.0.1' }]), /es-3\.0\.json/);
 });
 
 // Edem's M2 on #1 (Abena's ruling): the app reads only the latest release, so it holds the pack of every minor still in use; the
