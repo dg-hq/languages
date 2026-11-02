@@ -187,7 +187,7 @@ const unreadable = (text) => {
 export const LOCALE = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2}|-[0-9]{3})?$/;
 
 /**
- * The app range as Rust's semver VersionReq reads it, in one form: comparators such as >=3.0.0 or >=1.0.0-beta.1 joined by ", ".
+ * The app range as Rust's semver VersionReq reads it, in one form: comparators such as >=1.0.0-beta.1 or <1.1.0 joined by ", ".
  * Numbers have no leading zero, a pre-release is dot-separated [0-9A-Za-z-] identifiers (a numeric one without a leading zero), and
  * build metadata, which a range ignores, is refused.
  */

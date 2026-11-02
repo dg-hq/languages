@@ -4,11 +4,20 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+/** The file a pack is, from its version: the name the app downloads and checks the signature's trusted comment against. */
+const fileOf = (e) => `${e.locale}-${e.version.split('.').slice(0, 2).join('.')}.json`;
+
 export function buildIndex(entries) {
-  const locales = entries.map((e) => e.locale);
-  const twice = locales.filter((l, i) => locales.indexOf(l) !== i);
-  if (twice.length > 0) throw new Error(`refused: one pack a locale, and these come twice: ${[...new Set(twice)].join(', ')}`);
-  const packs = [...entries].sort((a, b) => (a.locale < b.locale ? -1 : a.locale > b.locale ? 1 : 0));
+  // Every supported minor's pack sits in the one latest release (Edem's M2), so a file, not a locale, comes once.
+  const files = entries.map(fileOf);
+  const twice = files.filter((f, i) => files.indexOf(f) !== i);
+  if (twice.length > 0) throw new Error(`refused: one pack a file, and these come twice: ${[...new Set(twice)].join(', ')}`);
+  const key = (e) => [e.locale, ...e.version.split('.').map(Number)];
+  const packs = [...entries].sort((a, b) => {
+    const [x, y] = [key(a), key(b)];
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+    return 0;
+  });
   return Buffer.from(`${JSON.stringify({ format: 1, packs }, null, 2)}\n`, 'utf8');
 }
 
