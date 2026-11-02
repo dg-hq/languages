@@ -186,8 +186,15 @@ const unreadable = (text) => {
 /** A tag we ship: a language, then a script and a region if any (es, en-GB, zh-Hans, es-419). Nothing else names a file. */
 export const LOCALE = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2}|-[0-9]{3})?$/;
 
-/** The app range as Rust's semver VersionReq reads it, in one form: comparators such as >=3.0.0 joined by ", ". */
-export const APP_RANGE = /^(>=|<=|>|<|=|\^|~)?\d+\.\d+\.\d+(, (>=|<=|>|<|=|\^|~)?\d+\.\d+\.\d+)*$/;
+/**
+ * The app range as Rust's semver VersionReq reads it, in one form: comparators such as >=3.0.0 or >=1.0.0-beta.1 joined by ", ".
+ * Numbers have no leading zero, a pre-release is dot-separated [0-9A-Za-z-] identifiers (a numeric one without a leading zero), and
+ * build metadata, which a range ignores, is refused.
+ */
+const NUM = '(0|[1-9]\\d*)';
+const PRE_ID = `(${NUM}|\\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const COMPARATOR = `(>=|<=|>|<|=|\\^|~)?${NUM}\\.${NUM}\\.${NUM}(-${PRE_ID}(\\.${PRE_ID})*)?`;
+export const APP_RANGE = new RegExp(`^${COMPARATOR}(, ${COMPARATOR})*$`);
 
 /** The words that guard a risky step: the TLS, Production and host-key questions, Connect anyway, the tunnel and edit guards. */
 const SAFETY = ['common.cancel', 'common.connect', 'compare.envWarn', 'connect.choice', 'env.', 'errors.connection.tls.', 'errors.connection.tunnel.', 'generate.blocked', 'gridEdit.review', 'guard.', 'hostKey.', 'sync.envWarn', 'tls.', 'tunnel.'];
