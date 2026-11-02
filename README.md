@@ -55,7 +55,7 @@ The secret half is only in the `packs` environment's `LANGUAGE_PACK_SIGNING_KEY`
 
 ## Making a release
 
-1. Put the app's `en-US.json` for the minor in `catalogues/<minor>/`, the translations beside it, and each pack in `catalogues/packs.json`.
+1. Put the newest `en-US.json` of the app minor in `catalogues/<minor>/`, the translations beside it, and each pack in `catalogues/packs.json`, keeping the entries of every minor still in use (see `catalogues/README.md`). build-all refuses the same file twice, a language's overlapping ranges, and an empty list.
 2. Run `node --test tests/build-pack.test.mjs` and `node tools/build-all.mjs out`, and read the safety words it lists (the TLS, Production and host-key questions, Connect anyway, the edit and tunnel guards): a pack owns them.
 3. Push a tag `packs-<yyyy-mm-dd>` on a commit that is on `main`. The release job refuses any other commit before it reads the key; then it tests the tools, builds every pack and the index, signs each with the packs key, checks each signature with the public key above, and publishes them.
 
