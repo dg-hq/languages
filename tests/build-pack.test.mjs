@@ -201,12 +201,32 @@ test('the index lists each pack once, by locale, in format 1', () => {
   assert.throws(() => buildIndex([a, a]), /one pack a locale/);
 });
 
-test('a release builds every pack packs.json lists, from the catalogues of its app minor, and refuses a version for another minor', async () => {
+// Edem's M2 on #1 (Abena's ruling): the app reads only the latest release, so it holds the pack of every minor still in use; the
+// file name (<locale>-<minor>.json) is the key, not the locale. The app's find takes the first entry whose range matches, so one
+// locale's ranges must not overlap. A pack serves its whole minor (M1: the app drops a key or argument its en-US lacks).
+test('a release builds every pack packs.json lists, from the catalogues of its app minor, several minors side by side', async () => {
   const { buildAll } = await import('../tools/build-all.mjs');
   const list = JSON.parse(readFileSync(join(ROOT, 'catalogues', 'packs.json'), 'utf8'));
-  assert.equal(buildAll(list).length, list.length);
+  if (list.length > 0) assert.equal(buildAll(list).length, list.length);
   const fixtures = join(ROOT, 'tests', 'fixtures', 'root');
-  const one = { minor: '3.0', locale: 'es', name: 'Spanish', nativeName: 'Español', version: '3.0.0', app: '>=3.0.0, <3.1.0' };
-  assert.equal(buildAll([one], fixtures)[0].fileName, 'es-3.0.json');
-  assert.throws(() => buildAll([{ ...one, version: '3.1.0' }], fixtures), /not for app minor 3.0/);
+  const one = { minor: '1.0', locale: 'es', name: 'Spanish', nativeName: 'Español', version: '1.0.0', app: '>=1.0.0-beta.1, <1.1.0' };
+  const two = { ...one, minor: '1.1', version: '1.1.0', app: '>=1.1.0, <1.2.0' };
+  assert.equal(buildAll([one], fixtures)[0].fileName, 'es-1.0.json');
+  assert.deepEqual(buildAll([one, two], fixtures).map((b) => b.fileName), ['es-1.0.json', 'es-1.1.json']);
+  assert.equal(buildAll([one, { ...one, locale: 'es-419', name: 'Spanish (Latin America)', nativeName: 'Español (Latinoamérica)' }], fixtures).length, 2);
+  const refused = (list, why) => assert.throws(() => buildAll(list, fixtures), why, JSON.stringify(list));
+  refused([], /no packs/);
+  refused([{ ...one, version: '1.1.0' }], /not for app minor 1\.0/);
+  refused([{ ...one, app: '>=1.1.0, <1.2.0' }], /must start in app minor 1\.0/);
+  refused([{ ...one, app: '>=1.0.0, <=1.0.9' }], /">=A" or ">=A, <B"/);
+  refused([{ ...one, app: '>=1.0.0, <1.0.0-beta.1' }], /empty/);
+  refused([one, { ...one, version: '1.0.1' }], /es-1\.0\.json twice/);
+  refused([{ ...one, app: '>=1.0.0-beta.1, <1.1.1' }, two], /overlap/);
+  refused([two, { ...one, app: '>=1.0.0-beta.1' }], /overlap/);
+});
+
+test("orders app versions as semver does, pre-releases before their release", async () => {
+  const { compareVersions } = await import('../tools/build-all.mjs');
+  const order = ['1.0.0-alpha', '1.0.0-alpha.1', '1.0.0-alpha.beta', '1.0.0-beta', '1.0.0-beta.2', '1.0.0-beta.11', '1.0.0-rc.1', '1.0.0', '1.0.1', '1.1.0', '2.0.0'];
+  for (let i = 0; i < order.length; i++) for (let k = 0; k < order.length; k++) assert.equal(Math.sign(compareVersions(order[i], order[k])), Math.sign(i - k), `${order[i]} ${order[k]}`);
 });

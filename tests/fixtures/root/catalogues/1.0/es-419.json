@@ -1,0 +1,9 @@
+{
+  "common.cancel": "Cancelar",
+  "common.close": "Cerrar",
+  "common.connect": "Conectar",
+  "connections.delete.title": "¿Eliminar {name}?",
+  "environments.delete.confirm": "{n, plural, =0 {Eliminar} one {Eliminar y mover # conexión} other {Eliminar y mover # conexiones}}",
+  "errors.connection.tls.uncheckedConnectAnyway": "Conectar de todos modos",
+  "tls.action.connect": "Conectar sin comprobar"
+}
