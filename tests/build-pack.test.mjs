@@ -1,7 +1,9 @@
 // Tests for tools/build-pack.mjs and tools/build-index.mjs. Run: node --test tests/build-pack.test.mjs
 import assert from 'node:assert/strict';
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { buildIndex } from '../tools/build-index.mjs';
@@ -171,19 +173,40 @@ test("signs as minisign does, in the prehashed ED form with a trusted comment (E
 });
 
 // Edem's Low on #1: the app verifies prehashed signatures only (minisign_verify, legacy off), and minisign -V takes both, so the
-// release job refuses a legacy signature (algorithm Ed, base64 "RW…") before it publishes.
+// release job refuses a legacy signature (algorithm Ed, base64 "RW…") before it publishes. Ekow's delta: the CLI must check what it
+// is given however it is started (no entry guard to skip), and the job requires its success line.
 test('the release job refuses a signature that is not prehashed (ED), as the app does', async () => {
-  const { prehashed } = await import('../tools/check-prehashed.mjs');
   const minisig = signPack(buildPack(EN, { 'common.cancel': 'Cancelar' }, META).bytes, TEST_SEED, 'es-3.0.json 3.0.0');
-  assert.equal(prehashed(minisig), true);
   const lines = minisig.split('\n');
   const legacy = Buffer.from(lines[1], 'base64');
   legacy.write('Ed', 0, 'latin1');
   assert.match(legacy.toString('base64'), /^RW/);
-  assert.equal(prehashed([lines[0], legacy.toString('base64'), ...lines.slice(2)].join('\n')), false);
+  const legacySig = [lines[0], legacy.toString('base64'), ...lines.slice(2)].join('\n');
+  const dir = mkdtempSync(join(tmpdir(), 'packs-check-'));
+  try {
+    writeFileSync(join(dir, 'good.minisig'), minisig);
+    writeFileSync(join(dir, 'old.minisig'), legacySig);
+    symlinkSync(join(ROOT, 'tools', 'check-prehashed.mjs'), join(dir, 'check.mjs'));
+    for (const tool of [join(ROOT, 'tools', 'check-prehashed.mjs'), join(dir, 'check.mjs')]) {
+      const run = (...files) => spawnSync(process.execPath, [tool, ...files.map((f) => join(dir, f))], { encoding: 'utf8' });
+      const ok = run('good.minisig', 'good.minisig');
+      assert.equal(ok.status, 0, tool);
+      assert.equal(ok.stdout, '2 signatures are prehashed (ED)\n', tool);
+      const no = run('good.minisig', 'old.minisig');
+      assert.equal(no.status, 1, tool);
+      assert.equal(no.stdout, '', tool);
+      assert.match(no.stderr, /old\.minisig/, tool);
+      assert.notEqual(run().status, 0, `${tool} with no files`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+  const { prehashed } = await import('../tools/build-pack.mjs');
+  assert.equal(prehashed(minisig), true);
+  assert.equal(prehashed(legacySig), false);
   for (const bad of ['', 'untrusted comment: x\n', 'untrusted comment: x\nnot base64!\n']) assert.equal(prehashed(bad), false, JSON.stringify(bad));
   const release = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
-  assert.match(release, /minisign -V -P "\$PACKS_PUBKEY" -m "\$f"; done\n\s+node tools\/check-prehashed\.mjs out\/\*\.minisig\n/);
+  assert.match(release, /minisign -V -P "\$PACKS_PUBKEY" -m "\$f"; done\n\s+node tools\/check-prehashed\.mjs out\/\*\.minisig \| grep -qx '\[0-9\]\* signatures are prehashed \(ED\)'\n/);
 });
 
 test("the test key never ships: its public half is in no file outside tests/, and it is not the release key", () => {
