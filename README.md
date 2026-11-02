@@ -13,8 +13,8 @@ One file per language and app minor version, `<locale>-<major>.<minor>.json`, wi
     "locale": "es",
     "name": "Spanish",
     "nativeName": "Español",
-    "version": "3.0.0",
-    "app": ">=3.0.0, <3.1.0",
+    "version": "1.0.0",
+    "app": ">=1.0.0-beta.1, <1.1.0",
     "keys": 4584,
     "rtl": false
   },
@@ -49,7 +49,7 @@ untrusted comment: minisign public key 06AF8017F1321771
 RWRxFzLxF4CvBv5c61B4irdglkLRU91bgCLKEG+WcpL3CM+APfBYSBhL
 ```
 
-Check any file by hand with `minisign -V -P RWRxFzLxF4CvBv5c61B4irdglkLRU91bgCLKEG+WcpL3CM+APfBYSBhL -m es-3.0.json`.
+Check any file by hand with `minisign -V -P RWRxFzLxF4CvBv5c61B4irdglkLRU91bgCLKEG+WcpL3CM+APfBYSBhL -m es-1.0.json`.
 
 The secret half is only in the `packs` environment's `LANGUAGE_PACK_SIGNING_KEY` secret (the owner approves each release run), as an unencrypted minisign secret key (`minisign -G -W`), since the release job cannot type a password. The tests sign with a test key that never ships; a test checks its public half is in no file outside `tests/`.
 

@@ -1,6 +1,6 @@
 // Builds every pack catalogues/packs.json lists, and index.json, into <out dir>: what a release publishes, before signing.
 //   node tools/build-all.mjs <out dir>
-// packs.json: [{ "minor": "3.0", "locale": "es", "name": "Spanish", "nativeName": "Español", "version": "3.0.0", "app": ">=3.0.0, <3.1.0", "rtl": false }]
+// packs.json: [{ "minor": "1.0", "locale": "es", "name": "Spanish", "nativeName": "Español", "version": "1.0.0", "app": ">=1.0.0-beta.1, <1.1.0", "rtl": false }]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildIndex } from './build-index.mjs';
