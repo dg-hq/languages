@@ -170,6 +170,22 @@ test("signs as minisign does, in the prehashed ED form with a trusted comment (E
   assert.equal(signPack(bytes, TEST_SEED, 'es-3.0.json 3.0.0'), minisig);
 });
 
+// Edem's Low on #1: the app verifies prehashed signatures only (minisign_verify, legacy off), and minisign -V takes both, so the
+// release job refuses a legacy signature (algorithm Ed, base64 "RW…") before it publishes.
+test('the release job refuses a signature that is not prehashed (ED), as the app does', async () => {
+  const { prehashed } = await import('../tools/check-prehashed.mjs');
+  const minisig = signPack(buildPack(EN, { 'common.cancel': 'Cancelar' }, META).bytes, TEST_SEED, 'es-3.0.json 3.0.0');
+  assert.equal(prehashed(minisig), true);
+  const lines = minisig.split('\n');
+  const legacy = Buffer.from(lines[1], 'base64');
+  legacy.write('Ed', 0, 'latin1');
+  assert.match(legacy.toString('base64'), /^RW/);
+  assert.equal(prehashed([lines[0], legacy.toString('base64'), ...lines.slice(2)].join('\n')), false);
+  for (const bad of ['', 'untrusted comment: x\n', 'untrusted comment: x\nnot base64!\n']) assert.equal(prehashed(bad), false, JSON.stringify(bad));
+  const release = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
+  assert.match(release, /minisign -V -P "\$PACKS_PUBKEY" -m "\$f"; done\n\s+node tools\/check-prehashed\.mjs out\/\*\.minisig\n/);
+});
+
 test("the test key never ships: its public half is in no file outside tests/, and it is not the release key", () => {
   const testKey = publicKeyOf(TEST_SEED).split('\n')[1];
   const raw = Buffer.from(testKey, 'base64').subarray(10);
