@@ -31,7 +31,9 @@ jobs:
       - name: Refuse a tag whose commit is not on main
         # Ekow's read of #1: a packs-* tag on any other commit would run that commit's tools with the key.
         run: |
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$GITHUB_REF_NAME is not on main, so nothing is signed"; exit 1; }
+          # main by a ref only this step writes: a bare origin/main would resolve a pushed tag of that name first (Ekow's delta).
+          git fetch --no-tags origin +refs/heads/main:refs/ci/main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/ci/main || { echo "$GITHUB_REF_NAME is not on main, so nothing is signed"; exit 1; }
 
       - name: Test the tools
         run: node --version && node --test tests/build-pack.test.mjs
