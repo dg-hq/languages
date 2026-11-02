@@ -19,8 +19,8 @@ env:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    # The key is the packs environment's secret (the owner reviews each run, Meridian 9582); without the environment the
-    # secret is empty and the Sign step refuses, so a release fails closed.
+    # The key is the packs environment's secret (the owner reviews each run, Meridian 9582). This holds once the repository-level
+    # secret of the same name is deleted (the owner's settings script): then a job without the environment has no key, and Sign refuses.
     environment: packs
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
