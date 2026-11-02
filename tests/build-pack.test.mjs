@@ -77,6 +77,21 @@ test("refuses tRich's markers, control characters, and bidi overrides and isolat
   }
 });
 
+// Ekow's read of #1: the app refuses C1 controls too (Rust's char::is_control), so a pack holding one would be signed and then refused.
+test('refuses C1 control characters as the app does (U+0080 to U+009F), and still takes the letters after them', () => {
+  for (const c of ['\u0080', '\u0085', '\u009B', '\u009F']) refused({ 'common.cancel': `a${c}b` });
+  assert.equal(reason({ 'common.cancel': 'Cancelar \u00A0ya \u00E9' }), 'built');
+});
+
+// Ekow's read of #1 (Infos): what the app checks, build-pack checks first, so nothing is signed that the app would refuse or change.
+test('refuses a pack over the app cap of 2 MiB, and a name or nativeName the app would not show as written', () => {
+  const big = 'x'.repeat(2 * 1024 * 1024);
+  assert.match(reason({ 'common.cancel': big }), /over 2 MiB/);
+  for (const name of ['', 'Span\u202Eish', 'Spa\u0007nish', 'S'.repeat(65)]) assert.match(reason({ 'common.cancel': 'Cancelar' }, { ...META, name }), /name/, JSON.stringify(name));
+  for (const nativeName of ['', 'Espa\u2066ñol', 'Espa\u0085ñol', 'é'.repeat(65)]) assert.match(reason({ 'common.cancel': 'Cancelar' }, { ...META, nativeName }), /nativeName/, JSON.stringify(nativeName));
+  assert.equal(reason({ 'common.cancel': 'Cancelar' }, { ...META, nativeName: 'ñ'.repeat(64) }), 'built');
+});
+
 test('refuses a locale tag that is not one we ship, before it names a file, and a version that is not semver (Ekow 5)', () => {
   for (const locale of ['../es', 'es/../../x', 'ES', 'es_ES', 'es-es', '']) refused({ 'common.cancel': 'Cancelar' }, { ...META, locale });
   for (const locale of ['es', 'en-GB', 'zh-Hans', 'es-419']) assert.equal(reason({ 'common.cancel': 'Cancelar' }, { ...META, locale }), 'built');
