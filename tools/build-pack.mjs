@@ -7,7 +7,8 @@
 // It refuses what the app refuses: a key en-US lacks; arguments that differ from en-US's, read as the window's own parser reads them;
 // a value that is not a string or does not parse; U+E000/U+E001 (tRich's markers); a control character other than \n (C0, DEL
 // and C1, as Rust's is_control); a bidi override or isolate (U+202A–202E, U+2066–2069; LRM and RLM stay); a locale tag we do not
-// ship; a version that is not semver; a name or nativeName the app would not show as written; a pack over the app's 2 MiB.
+// ship; a version that is not semver; a name or nativeName the app would not show as written; a pack over the app's 2 MiB; a
+// message that drops a select case en-US has, or a plural form en-US has that the pack's language uses (CLDR categories).
 import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -142,6 +143,32 @@ function walk(nodes, found) {
 }
 
 
+/** Each plural or select argument's forms, at every depth: "n plural" → Set of its selectors. */
+function formsOf(nodes, out = new Map()) {
+  for (const node of nodes) {
+    if (node.kind !== 'plural' && node.kind !== 'select') continue;
+    const key = `${node.name} ${node.kind}`;
+    out.set(key, new Set([...(out.get(key) ?? []), ...node.cases.keys()]));
+    for (const c of node.cases.values()) formsOf(c, out);
+  }
+  return out;
+}
+
+/** The forms en-US has that the pack drops: every select case; a plural's categories that the pack's language has (CLDR). */
+function droppedForms(text, english, locale) {
+  const has = formsOf(new Reader(text).top());
+  const categories = new Set(new Intl.PluralRules(locale).resolvedOptions().pluralCategories);
+  const dropped = [];
+  for (const [key, forms] of formsOf(new Reader(english).top())) {
+    const [name, kind] = key.split(' ');
+    for (const f of forms) {
+      if (has.get(key)?.has(f)) continue;
+      if (kind === 'select' || categories.has(f)) dropped.push(`${kind} ${kind === 'select' ? 'case' : 'form'} ${f} of {${name}}`);
+    }
+  }
+  return dropped;
+}
+
 const argsOf = (text) => {
   const found = new Set();
   walk(new Reader(text).top(), found);
@@ -190,6 +217,7 @@ export function buildPack(en, source, { locale, name, nativeName, version, app, 
     else if (unreadable(v)) bad.push(`${key}: ${unreadable(v)}`);
     else if (argsOf(v) !== argsOf(en[key])) bad.push(`${key}: args ${argsOf(v)} ≠ en-US ${argsOf(en[key])}`);
     else if (/[\uE000\uE001]/.test(v)) bad.push(`${key}: holds a tRich marker`);
+    else if (LOCALE.test(locale ?? '') && droppedForms(v, en[key], locale).length > 0) bad.push(`${key}: drops ${droppedForms(v, en[key], locale).join(', ')}`);
     else if (CONTROL.test(v)) bad.push(`${key}: a control character`);
     else if (/[\u202A-\u202E\u2066-\u2069]/.test(v)) bad.push(`${key}: a bidi override or isolate`);
     else messages[key] = v;

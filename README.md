@@ -37,7 +37,7 @@ The app downloads over HTTPS only, with a size cap, and then:
 1. checks the signature over the exact bytes it downloaded, with the packs key it ships (below), before it reads them;
 2. reads the manifest from those bytes, never from the index;
 3. refuses a pack for another locale, another app version, or an older version than the one installed;
-4. refuses a key its English does not have, a message whose arguments differ from English, a message it cannot parse, the app's own rich-text markers (U+E000, U+E001), control characters other than a line break (C0, DEL and C1), and bidi overrides and isolates (U+202A–202E, U+2066–2069); `build-pack` refuses all of these first, and also a pack over 2 MiB (the most the app downloads) and a `name` or `nativeName` the app would not show as written (empty, a control or bidi character, over 64 characters);
+4. refuses a key its English does not have, a message whose arguments differ from English, a message it cannot parse, the app's own rich-text markers (U+E000, U+E001), control characters other than a line break (C0, DEL and C1), and bidi overrides and isolates (U+202A–202E, U+2066–2069); `build-pack` refuses all of these first, and also a message that drops a select case en-US has, or a plural form en-US has that the pack's language uses (its CLDR plural categories; an exact `=N` form is the pack's choice), a pack over 2 MiB (the most the app downloads) and a `name` or `nativeName` the app would not show as written (empty, a control or bidi character, over 64 characters);
 5. checks the signature again each time it starts, and shows English if anything fails.
 
 `tools/build-pack.mjs` refuses the same things, so a pack that would be refused is never published.
