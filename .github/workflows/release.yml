@@ -1,0 +1,71 @@
+# Builds, signs and publishes the language packs when a tag packs-<date> is pushed (README: Making a release).
+# The packs key's secret half is only in the LANGUAGE_PACK_SIGNING_KEY secret; every file is checked against the public
+# key the app ships before anything is published, so a wrong or missing key publishes nothing; a tag not on main signs nothing.
+# No action but actions/checkout (pinned by commit):
+# node is the runner's own (the tools need 20.11 or later and no packages), minisign is Ubuntu's package.
+name: Release language packs
+
+on:
+  push:
+    tags: ['packs-*']
+
+permissions:
+  contents: write
+
+env:
+  # The app's packs key (Datagator's PACKS_PUBKEY), id 06AF8017F1321771.
+  PACKS_PUBKEY: RWRxFzLxF4CvBv5c61B4irdglkLRU91bgCLKEG+WcpL3CM+APfBYSBhL
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    # The key is the packs environment's secret (the owner reviews each run, Meridian 9582). This holds once the repository-level
+    # secret of the same name is deleted (the owner's settings script): then a job without the environment has no key, and Sign refuses.
+    environment: packs
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a tag whose commit is not on main
+        # Ekow's read of #1: a packs-* tag on any other commit would run that commit's tools with the key.
+        run: |
+          # main by a ref only this step writes: a bare origin/main would resolve a pushed tag of that name first (Ekow's delta).
+          git fetch --no-tags origin +refs/heads/main:refs/ci/main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/ci/main || { echo "$GITHUB_REF_NAME is not on main, so nothing is signed"; exit 1; }
+
+      - name: Test the tools
+        run: node --version && node --test tests/build-pack.test.mjs
+
+      - name: Build every pack and the index
+        run: node tools/build-all.mjs out
+
+      - name: Install minisign
+        # Ubuntu 24.04's own package (universe), not a download: the runner's apt checks it against Ubuntu's signed archive.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends minisign && minisign -v
+
+      - name: Sign
+        env:
+          LANGUAGE_PACK_SIGNING_KEY: ${{ secrets.LANGUAGE_PACK_SIGNING_KEY }}
+        run: |
+          set -eu
+          if [ -z "$LANGUAGE_PACK_SIGNING_KEY" ]; then echo "LANGUAGE_PACK_SIGNING_KEY is not set: nothing is signed"; exit 1; fi
+          umask 077
+          key="$RUNNER_TEMP/packs.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$LANGUAGE_PACK_SIGNING_KEY" > "$key"
+          for f in out/*.json; do
+            minisign -S -s "$key" -m "$f" -t "$(basename "$f") $GITHUB_REF_NAME" < /dev/null
+          done
+
+      - name: Check every signature with the app's key
+        run: |
+          set -eu
+          for f in out/*.json; do minisign -V -P "$PACKS_PUBKEY" -m "$f"; done
+          node tools/check-prehashed.mjs out/*.minisig | grep -qx '[0-9]* signatures are prehashed (ED)'
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/* --title "Language packs $GITHUB_REF_NAME" --notes "Packs and index.json, each with its .minisig (key 06AF8017F1321771)."

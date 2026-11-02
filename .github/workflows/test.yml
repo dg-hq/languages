@@ -1,0 +1,20 @@
+name: Test the tools
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - run: node --version && node --test tests/build-pack.test.mjs
+      # The real packs.json may be empty (build-all refuses that, for the release); the fixture root holds two es minors.
+      - run: node tools/build-all.mjs "$RUNNER_TEMP/out" --root tests/fixtures/root
