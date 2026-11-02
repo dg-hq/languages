@@ -63,7 +63,7 @@ jobs:
         run: |
           set -eu
           for f in out/*.json; do minisign -V -P "$PACKS_PUBKEY" -m "$f"; done
-          node tools/check-prehashed.mjs out/*.minisig
+          node tools/check-prehashed.mjs out/*.minisig | grep -qx '[0-9]* signatures are prehashed (ED)'
 
       - name: Publish
         env:

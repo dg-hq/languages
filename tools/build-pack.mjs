@@ -261,6 +261,14 @@ export function signPack(bytes, seed, trusted) {
   return `untrusted comment: signature from a Datagator packs test key\n${Buffer.concat([Buffer.from('ED'), id, sig]).toString('base64')}\ntrusted comment: ${trusted}\n${global.toString('base64')}\n`;
 }
 
+/** Whether a .minisig's signature line is minisign's prehashed form (74 bytes, algorithm "ED"): the only form the app verifies. */
+export function prehashed(minisig) {
+  const line = minisig.split('\n')[1] ?? '';
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(line)) return false;
+  const sig = Buffer.from(line, 'base64');
+  return sig.length === 74 && sig.subarray(0, 2).toString('latin1') === 'ED';
+}
+
 if (process.argv[1] === import.meta.filename) {
   const args = process.argv.slice(2);
   const flag = (f) => (args.includes(f) ? args[args.indexOf(f) + 1] : null);
