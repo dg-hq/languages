@@ -63,6 +63,29 @@ test("a select or plural form's words are text, not arguments; LRM, RLM and a li
   assert.equal(reason({ 'common.cancel': 'Can‎celar‏\nya' }), 'built');
 });
 
+// Abena 11-02 (the ja pass): argument names alone let a message drop 10 of its 14 select cases, and each dropped case then read
+// another case's words. A select keeps every case en-US has; a plural needs en-US's forms only where the pack's language has that
+// category (CLDR: ja has only other, es has one, many and other); an exact form (=0) is the pack's choice.
+test("refuses a dropped select case, and a plural form the pack's language has; takes what that language does not use", () => {
+  const en = {
+    'kind.label': '{kind, select, table {Table {name}} view {View {name}} other {Object {name}}}',
+    'rows.count': '{n, plural, =0 {No rows} one {# row} other {# rows}}',
+  };
+  const build = (messages, locale = 'es') => {
+    try {
+      buildPack(en, messages, { ...META, locale });
+    } catch (e) {
+      return e.message;
+    }
+    return 'built';
+  };
+  assert.match(build({ 'kind.label': '{kind, select, table {Tabla {name}} other {Objeto {name}}}' }), /kind\.label: drops select case view of \{kind\}/);
+  assert.equal(build({ 'kind.label': '{kind, select, table {Tabla {name}} view {Vista {name}} other {Objeto {name}}}' }), 'built');
+  assert.match(build({ 'rows.count': '{n, plural, other {# filas}}' }, 'es'), /rows\.count: drops plural form one of \{n\}/);
+  assert.equal(build({ 'rows.count': '{n, plural, one {# fila} other {# filas}}' }, 'es'), 'built');
+  assert.equal(build({ 'rows.count': '{n, plural, other {#行}}' }, 'ja'), 'built');
+});
+
 test('refuses what the app refuses: a key en-US lacks, other arguments, a non-string, an unreadable message', () => {
   assert.match(reason({ 'no.such.key': 'x' }), /no\.such\.key: not in en-US/);
   const arg = 'connections.delete.title';
