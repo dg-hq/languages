@@ -1,0 +1,17 @@
+name: Test the tools
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --version && node --test tests/build-pack.test.mjs
+      - run: node tools/build-all.mjs out
