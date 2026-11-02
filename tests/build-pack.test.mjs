@@ -128,6 +128,14 @@ test("writes the app range as Rust's semver reads it: comparators joined by a co
   for (const app of ['>=3.0.0 <3.1.0', '>=3.0.0,<3.1.0', '3.0', '*', '', '>=3.0.0 || <2.0.0']) assert.match(reason({ 'common.cancel': 'Cancelar' }, { ...META, app }), /not an app range/, app);
 });
 
+// V3 ships as 1.0.0-beta.1 (Meridian 9669), so its packs say ">=1.0.0-beta.1, <1.1.0". A comparator may carry a pre-release as
+// Rust's semver reads one (dot-separated [0-9A-Za-z-] identifiers, no leading zero in a numeric one); build metadata, which a
+// range ignores, and a leading zero anywhere are refused.
+test('takes a pre-release in a comparator, as Rust semver reads it', () => {
+  for (const app of ['>=1.0.0-beta.1, <1.1.0', '>=1.0.0-rc.0', '=1.0.0-x-y.2a', '>=1.0.0-beta, <1.1.0']) assert.equal(reason({ 'common.cancel': 'Cancelar' }, { ...META, app }), 'built', app);
+  for (const app of ['>=1.0.0-', '>=1.0.0-beta..1', '>=1.0.0-beta.01', '>=1.0.0+build.1', '>=1.0-beta.1', '>=01.0.0', '>=1.0.0-beta_1']) assert.match(reason({ 'common.cancel': 'Cancelar' }, { ...META, app }), /not an app range/, app);
+});
+
 test('lists the safety words a pack changes, for the owner to read before signing (Ekow 9)', () => {
   const s = safetyKeys(ES);
   for (const k of ['common.cancel', 'common.connect']) assert.ok(s.includes(k), k);
