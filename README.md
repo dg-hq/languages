@@ -63,7 +63,7 @@ The secret half is only in the `packs` environment's `LANGUAGE_PACK_SIGNING_KEY`
 
 - `tools/build-pack.mjs --en <en-US.json> <catalogue.json> <locale> <name> <nativeName> <version> <app range> <out dir>`: one pack and its index entry.
 - `tools/build-index.mjs <out dir>`: `index.json` from the entries.
-- `tools/build-all.mjs <out dir>`: every pack in `catalogues/packs.json`, and the index.
+- `tools/build-all.mjs <out dir> [--root <dir>]`: every pack in `catalogues/packs.json`, and the index; the test job passes `--root tests/fixtures/root`, since the real list may be empty and an empty list is refused.
 - `tools/check-prehashed.mjs <file.minisig>...`: refuses a signature that is not minisign's prehashed (ED) form, which is the only form the app verifies.
 
 Node 20.11 or later, no dependencies.

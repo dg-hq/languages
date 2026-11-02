@@ -1,5 +1,5 @@
 // Builds every pack catalogues/packs.json lists, and index.json, into <out dir>: what a release publishes, before signing.
-//   node tools/build-all.mjs <out dir>
+//   node tools/build-all.mjs <out dir> [--root <dir with catalogues/>]
 // packs.json, one entry a pack, every supported minor's side by side: [{ "minor": "1.0", "locale": "es", "name": "Spanish", "nativeName": "Español", "version": "1.0.0", "app": ">=1.0.0-beta.1, <1.1.0", "rtl": false }]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,10 +31,12 @@ export function buildAll(list, root = ROOT) {
 }
 
 if (process.argv[1] === import.meta.filename) {
-  const out = process.argv[2];
-  if (!out) throw new Error('usage: build-all.mjs <out dir>');
+  const [out, flag, dir] = process.argv.slice(2);
+  if (!out || (flag !== undefined && (flag !== '--root' || !dir))) throw new Error('usage: build-all.mjs <out dir> [--root <dir with catalogues/>]');
+  // The release builds the real catalogues; the test job passes the fixture root, as the real packs.json may be empty.
+  const root = dir ?? ROOT;
   mkdirSync(out, { recursive: true });
-  const built = buildAll(read(join(ROOT, 'catalogues', 'packs.json')));
+  const built = buildAll(read(join(root, 'catalogues', 'packs.json')), root);
   for (const { fileName, bytes, entry } of built) {
     writeFileSync(join(out, fileName), bytes);
     console.log(`${fileName}: ${entry.keys} of ${entry.of} keys, ${entry.bytes} bytes, sha256 ${entry.sha256}`);

@@ -3,6 +3,7 @@
 //   node tools/build-index.mjs <out dir>
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { APP_RANGE } from './build-pack.mjs';
 
 /** The file a pack is, from its version: the name the app downloads and checks the signature's trusted comment against. */
 const fileOf = (e) => `${e.locale}-${e.version.split('.').slice(0, 2).join('.')}.json`;
@@ -60,7 +61,8 @@ export function buildIndex(entries) {
   if (twice.length > 0) throw new Error(`refused: one pack a file, and these come twice: ${[...new Set(twice)].join(', ')}`);
   // The app installs the first entry whose range takes its version, so a locale's ranges must not overlap.
   const ranges = entries.map((e) => {
-    const [, from, to] = RANGE.exec(e.app ?? '') ?? [];
+    if (!APP_RANGE.test(e.app ?? '')) throw new Error(`refused: ${fileOf(e)}: not an app range Rust's semver reads: ${JSON.stringify(e.app)}`);
+    const [, from, to] = RANGE.exec(e.app) ?? [];
     if (from === undefined) throw new Error(`refused: ${fileOf(e)}: the tools take a range ">=A" or ">=A, <B", not ${JSON.stringify(e.app)}`);
     return { e, from, to };
   });
