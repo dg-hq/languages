@@ -1,0 +1,4 @@
+[
+  { "minor": "1.0", "locale": "es", "name": "Spanish", "nativeName": "Español", "version": "1.0.0", "app": ">=1.0.0-beta.1, <1.1.0", "rtl": false },
+  { "minor": "1.1", "locale": "es", "name": "Spanish", "nativeName": "Español", "version": "1.1.0", "app": ">=1.1.0-beta.1, <1.2.0", "rtl": false }
+]

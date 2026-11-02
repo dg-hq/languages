@@ -270,6 +270,23 @@ test('a release builds every pack packs.json lists, from the catalogues of its a
 // Edem's delta on #1: Rust's semver matches a pre-release only against a comparator with a pre-release on the same x.y.z, so
 // "<1.1.0" never takes 1.1.0-beta.1, and 1.0's and 1.1's beta ranges do not overlap. The overlap check reads ranges that way, and
 // lives in build-index, so an index made by hand is checked too (Abena).
+// Abena on #1's CI: the real packs.json is empty until the Spanish pack lands, and build-all refuses an empty list, so the test job
+// runs build-all, as the release does, on the fixture root (two minors of es side by side); the release keeps the real catalogues.
+test('build-all, run as the release runs it, writes every pack and the index from the root it is given', () => {
+  const out = mkdtempSync(join(tmpdir(), 'packs-out-'));
+  try {
+    const run = spawnSync(process.execPath, [join(ROOT, 'tools', 'build-all.mjs'), out, '--root', join(ROOT, 'tests', 'fixtures', 'root')], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(readdirSync(out).sort(), ['es-1.0.json', 'es-1.1.json', 'index.json']);
+    assert.deepEqual(JSON.parse(readFileSync(join(out, 'index.json'), 'utf8')).packs.map((p) => p.version), ['1.0.0', '1.1.0']);
+  } finally {
+    rmSync(out, { recursive: true });
+  }
+  const ci = readFileSync(join(ROOT, '.github', 'workflows', 'test.yml'), 'utf8');
+  assert.match(ci, /- run: node tools\/build-all\.mjs "\$RUNNER_TEMP\/out" --root tests\/fixtures\/root\n/);
+  assert.match(readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8'), /run: node tools\/build-all\.mjs out\n/);
+});
+
 test("judges overlap as Rust's semver matches: a pre-release only where a comparator names its x.y.z with one", async () => {
   const { buildAll } = await import('../tools/build-all.mjs');
   const fixtures = join(ROOT, 'tests', 'fixtures', 'root');
@@ -291,6 +308,8 @@ test("judges overlap as Rust's semver matches: a pre-release only where a compar
   overlap(at('1.0.0', '>=1.0.0-beta.1, <1.1.1'), at('1.1.0', '>=1.1.0, <1.2.0'));
   overlap(at('1.1.0', '>=1.1.0'), at('1.0.0', '>=1.0.0'));
   assert.throws(() => buildIndex([at('1.0.0', '^1.0.0')]), /">=A" or ">=A, <B"/);
+  // Edem's delta Info: an index made by hand gets the app-range check too, so a partial or zero-led version is refused there.
+  for (const app of ['>=1.0, <1.1', '>=1, <2', '>=01.0.0']) assert.throws(() => buildIndex([at('1.0.0', app)]), /not an app range/, app);
   apart(at('1.0.0', '>=1.0.0, <1.1.0'), { ...at('1.0.0', '>=1.0.0, <1.1.0'), locale: 'en-GB' });
 });
 
