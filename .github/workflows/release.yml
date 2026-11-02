@@ -1,6 +1,7 @@
 # Builds, signs and publishes the language packs when a tag packs-<date> is pushed (README: Making a release).
 # The packs key's secret half is only in the LANGUAGE_PACK_SIGNING_KEY secret; every file is checked against the public
-# key the app ships before anything is published, so a wrong or missing key publishes nothing. No action but actions/checkout:
+# key the app ships before anything is published, so a wrong or missing key publishes nothing; a tag not on main signs nothing.
+# No action but actions/checkout (pinned by commit):
 # node is the runner's own (the tools need 20.11 or later and no packages), minisign is Ubuntu's package.
 name: Release language packs
 
@@ -19,7 +20,15 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse a tag whose commit is not on main
+        # Ekow's read of #1: a packs-* tag on any other commit would run that commit's tools with the key.
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$GITHUB_REF_NAME is not on main, so nothing is signed"; exit 1; }
 
       - name: Test the tools
         run: node --version && node --test tests/build-pack.test.mjs

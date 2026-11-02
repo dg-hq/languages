@@ -5,8 +5,9 @@
 // such a pack is for tests only, and its key never ships (tests/build-pack.test.mjs pins that). --en is the app's en-US catalogue for
 // the app minor the pack is for: the keys and arguments a pack may have.
 // It refuses what the app refuses: a key en-US lacks; arguments that differ from en-US's, read as the window's own parser reads them;
-// a value that is not a string or does not parse; U+E000/U+E001 (tRich's markers); a control character other than \n; a bidi
-// override or isolate (U+202A–202E, U+2066–2069; LRM and RLM stay); a locale tag we do not ship; a version that is not semver.
+// a value that is not a string or does not parse; U+E000/U+E001 (tRich's markers); a control character other than \n (C0, DEL
+// and C1, as Rust's is_control); a bidi override or isolate (U+202A–202E, U+2066–2069; LRM and RLM stay); a locale tag we do not
+// ship; a version that is not semver; a name or nativeName the app would not show as written; a pack over the app's 2 MiB.
 import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -166,8 +167,17 @@ const SAFETY = ['common.cancel', 'common.connect', 'compare.envWarn', 'connect.c
 export const safetyKeys = (messages) => Object.keys(messages).filter((k) => SAFETY.some((p) => k.startsWith(p))).sort();
 
 /** The pack's bytes and its index entry. Throws "refused: …", one line a problem, as the app would refuse it. */
+// The app's own limits (Edem's verifier): its control check is Rust's char::is_control (C0, DEL and C1), and it downloads at most 2 MiB.
+const CONTROL = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/;
+const PACK_CAP = 2 * 1024 * 1024;
+
 export function buildPack(en, source, { locale, name, nativeName, version, app, rtl = false }, only = null) {
   const bad = [];
+  for (const [field, v] of [['name', name], ['nativeName', nativeName]]) {
+    if (typeof v !== 'string' || v === '' || CONTROL.test(v) || /[\u202A-\u202E\u2066-\u2069]/.test(v) || [...v].length > 64) {
+      bad.push(`${field}: not shown as written (empty, a control, a bidi override or isolate, or over 64 characters): ${JSON.stringify(v)}`);
+    }
+  }
   if (!LOCALE.test(locale ?? '')) bad.push(`not a locale tag we ship: ${JSON.stringify(locale)}`);
   if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) bad.push(`not a semver version: ${JSON.stringify(version)}`);
   if (!APP_RANGE.test(app ?? '')) bad.push(`not an app range Rust's semver reads (comparators joined by ", "): ${JSON.stringify(app)}`);
@@ -180,7 +190,7 @@ export function buildPack(en, source, { locale, name, nativeName, version, app, 
     else if (unreadable(v)) bad.push(`${key}: ${unreadable(v)}`);
     else if (argsOf(v) !== argsOf(en[key])) bad.push(`${key}: args ${argsOf(v)} ≠ en-US ${argsOf(en[key])}`);
     else if (/[\uE000\uE001]/.test(v)) bad.push(`${key}: holds a tRich marker`);
-    else if (/[\u0000-\u0009\u000B-\u001F\u007F]/.test(v)) bad.push(`${key}: a control character`);
+    else if (CONTROL.test(v)) bad.push(`${key}: a control character`);
     else if (/[\u202A-\u202E\u2066-\u2069]/.test(v)) bad.push(`${key}: a bidi override or isolate`);
     else messages[key] = v;
   }
@@ -190,6 +200,7 @@ export function buildPack(en, source, { locale, name, nativeName, version, app, 
   const pack = { format: 1, manifest: { locale, name, nativeName, version, app, keys, rtl }, messages };
   const [major, minor] = version.split('.');
   const bytes = Buffer.from(`${JSON.stringify(pack, null, 2)}\n`, 'utf8');
+  if (bytes.length > PACK_CAP) throw new Error(`refused:\nthe pack is ${bytes.length} bytes, over 2 MiB, the most the app downloads`);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   return { fileName: `${locale}-${major}.${minor}.json`, bytes, entry: { locale, name, nativeName, version, app, keys, of: Object.keys(en).length, bytes: bytes.length, sha256, rtl } };
 }
