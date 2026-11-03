@@ -16,5 +16,7 @@ jobs:
         with:
           persist-credentials: false
       - run: node --version && node --test tests/build-pack.test.mjs
-      # The real packs.json may be empty (build-all refuses that, for the release); the fixture root holds two es minors.
+      # The fixture root holds two es minors, so the tools are tested on several minors side by side.
       - run: node tools/build-all.mjs "$RUNNER_TEMP/out" --root tests/fixtures/root
+      # The real catalogues, as the release builds them, so a pack buildPack refuses fails here and not at the tag (Ekow's Low on #2).
+      - run: node tools/build-all.mjs "$RUNNER_TEMP/real"
